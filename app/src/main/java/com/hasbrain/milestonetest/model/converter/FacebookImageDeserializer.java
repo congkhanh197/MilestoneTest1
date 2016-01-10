@@ -26,6 +26,8 @@ public class FacebookImageDeserializer extends EasyDeserializer<FacebookImage> {
             facebookImage.setName(getStringValue(jsonObject.get("name"), null));
             facebookImage.setThumbnailUrl(getStringValue(jsonObject.get("picture"), null));
             facebookImage.setCreatedTime(getStringValue(jsonObject.get("created_time"), null));
+            facebookImage.setHeight(getStringValue(jsonObject.get("height"), null));
+            facebookImage.setWidth(getStringValue(jsonObject.get("width"), null));
             JsonElement authorJsonElement = jsonObject.get("from");
             if (authorJsonElement != null && authorJsonElement.isJsonObject()) {
                 facebookImage.setFromUserName(getStringValue(authorJsonElement.getAsJsonObject().get("name"), null));

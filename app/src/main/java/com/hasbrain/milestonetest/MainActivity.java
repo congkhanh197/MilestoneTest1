@@ -1,26 +1,10 @@
 package com.hasbrain.milestonetest;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import com.facebook.AccessToken;
-import com.facebook.CallbackManager;
-import com.facebook.FacebookCallback;
-import com.facebook.FacebookException;
-import com.facebook.GraphRequest;
-import com.facebook.GraphResponse;
-import com.facebook.HttpMethod;
-import com.facebook.login.LoginManager;
-import com.facebook.login.LoginResult;
-import com.hasbrain.milestonetest.model.FacebookImage;
-import com.hasbrain.milestonetest.model.FacebookPhotoResponse;
-import com.hasbrain.milestonetest.model.converter.FacebookImageDeserializer;
-import com.hasbrain.milestonetest.model.converter.FacebookPhotoResponseDeserializer;
-import com.squareup.picasso.Picasso;
-
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.StringDef;
 import android.support.design.widget.FloatingActionButton;
@@ -36,6 +20,27 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.facebook.AccessToken;
+import com.facebook.CallbackManager;
+import com.facebook.FacebookCallback;
+import com.facebook.FacebookException;
+import com.facebook.GraphRequest;
+import com.facebook.GraphResponse;
+import com.facebook.HttpMethod;
+import com.facebook.login.LoginManager;
+import com.facebook.login.LoginResult;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.hasbrain.milestonetest.model.FacebookImage;
+import com.hasbrain.milestonetest.model.FacebookPhotoResponse;
+import com.hasbrain.milestonetest.model.converter.FacebookImageDeserializer;
+import com.hasbrain.milestonetest.model.converter.FacebookPhotoResponseDeserializer;
+import com.squareup.picasso.Picasso;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 
@@ -65,11 +70,25 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         setTitle("Your facebook photos");
         ButterKnife.bind(this);
         swipeRefreshLayout.setOnRefreshListener(this);
+        swipeRefreshLayout.post(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        swipeRefreshLayout.setRefreshing(true);
+                                        getUserPhotos(TYPE_UPLOADED, null);
+                                        swipeRefreshLayout.setRefreshing(false);
+                                    }
+                                }
+        );
         rvPhotos.setLayoutManager(new LinearLayoutManager(this));
+        final MarshMallowPermission marshMallowPermission = new MarshMallowPermission(this);
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                openCameraForImage();
+                if (requestingPermissions()){
+                    marshMallowPermission.requestPermissionForCamera();
+                }else{
+                    openCameraForImage();
+                }
             }
         });
         getUserPhotos(TYPE_UPLOADED, null);
@@ -82,24 +101,65 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     @Override
     public void onRefresh() {
         getUserPhotos(TYPE_UPLOADED, null);
+        swipeRefreshLayout.setRefreshing(false);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (REQUEST_IMAGE == requestCode && resultCode == RESULT_OK) {
+        /*if (REQUEST_IMAGE == requestCode && resultCode == RESULT_OK) {
             Bitmap bitmapData = data.getParcelableExtra("data");
             if (bitmapData != null) {
                 uploadPhotoToFacebook(bitmapData);
             }
         } else {
             callbackManager.onActivityResult(requestCode, resultCode, data);
+        }*/
+        if (REQUEST_IMAGE == requestCode) {
+            if (resultCode == RESULT_OK) {
+                File file = new File(Environment.getExternalStorageDirectory(),  "Pic.jpg");
+                if (file.exists()){
+                    InputStream is = null;
+                    try {
+                        is = new FileInputStream(file);
+                        Bitmap bitmapData = BitmapFactory.decodeStream(is);
+                        if (bitmapData != null) {
+                            uploadPhotoToFacebook(bitmapData);
+                        }
+                        is.close();
+                        is = null;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        if (is != null){
+                            try {
+                                is.close();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                    file.delete();
+                }
+            }
+        } else {
+            callbackManager.onActivityResult(requestCode, resultCode, data);
+        }
+
+    }
+
+    private boolean requestingPermissions() {
+        MarshMallowPermission marshMallowPermission = new MarshMallowPermission(this);
+        if (marshMallowPermission.checkPermissionForCamera()) {
+            return false;
+        } else {
+            return true;
         }
     }
 
     private void openCameraForImage() {
-        Intent openCameraForImageIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-        startActivityForResult(openCameraForImageIntent, REQUEST_IMAGE);
+            Intent openCameraForImageIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            startActivityForResult(openCameraForImageIntent, REQUEST_IMAGE);
     }
 
     private void uploadPhotoToFacebook(final Bitmap imageBitmap) {
@@ -152,7 +212,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
     private void getUserPhotos(@PHOTO_TYPE String photoType, final String after) {
         AccessToken accessToken = AccessToken.getCurrentAccessToken();
         Bundle parameters = new Bundle();
-        parameters.putString("fields", "id,name,images,picture,created_time");
+        parameters.putString("fields", "id,name,images,picture,created_time,height,width");
         parameters.putString("type", photoType);
         if (after != null) {
             parameters.putString("after", after);
@@ -187,6 +247,8 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         TextView tvImageName;
         @Bind(R.id.tv_image_time)
         TextView tvImageTime;
+        @Bind(R.id.tv_size)
+        TextView tvSize;
         private Picasso picasso;
 
         public FacebookImageVH(Picasso picasso, View itemView) {
@@ -199,6 +261,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
             picasso.load(facebookImage.getImageUrl()).into(ivFacebookPhoto);
             tvImageName.setText(facebookImage.getName());
             tvImageTime.setText(facebookImage.getCreatedTime());
+            tvSize.setText(facebookImage.getHeight()+"x"+facebookImage.getWidth());
         }
     }
 
@@ -209,7 +272,7 @@ public class MainActivity extends AppCompatActivity implements SwipeRefreshLayou
         private List<FacebookImage> facebookImages;
 
         public FacebookImageAdapter(LayoutInflater layoutInflater, Picasso picasso,
-                List<FacebookImage> facebookImages) {
+                                    List<FacebookImage> facebookImages) {
             this.layoutInflater = layoutInflater;
             this.picasso = picasso;
             this.facebookImages = facebookImages;

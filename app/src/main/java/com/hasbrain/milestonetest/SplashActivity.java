@@ -1,16 +1,17 @@
 package com.hasbrain.milestonetest;
 
+import android.content.Intent;
+import android.os.Bundle;
+import android.os.Handler;
+import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
-
-import android.content.Intent;
-import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
@@ -27,6 +28,17 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
         ButterKnife.bind(this);
+
+        if (isLoggedIn()){
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    navigateIntoMainActivity();
+                }
+            }, 2000);
+            return;
+        }
+
         btFacebookLogin.setReadPermissions(FACEBOOK_PERMISSIONS);
         callbackManager = CallbackManager.Factory.create();
         btFacebookLogin.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
@@ -47,6 +59,11 @@ public class SplashActivity extends AppCompatActivity {
 
             }
         });
+    }
+
+    private boolean isLoggedIn() {
+        AccessToken accessToken = AccessToken.getCurrentAccessToken();
+        return accessToken != null;
     }
 
     @Override
